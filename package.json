@@ -28,7 +28,7 @@
     "power-assert": "^1.4.4"
   },
   "bin": {
-    "tetris-diagram": "bin/tetris-diagram"
+    "animationis": "bin/animationis"
   },
   "babel": {
     "presets": [
