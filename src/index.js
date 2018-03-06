@@ -9,10 +9,12 @@ import Path from "path"
 import Util from "util"
 import ChildProcess from "child_process"
 
+// TODO: error handling!
 export default class Animationis {
   static async processFile(path, _options) {
     const supplement = (opt, def) => { if (opt == null) return def; else return opt }
     const options = {
+      gif: supplement(_options.gif, false),
       keepIntermediate: supplement(_options.keepIntermediate, false)
     }
     Log.debug("With options:")
@@ -26,7 +28,13 @@ export default class Animationis {
 
     Log.info(`Loading input file: ${path}`)
     Rechoir.prepare(InterpretConfig, resolvedPath)
-    const __input = require(resolvedPath)
+    let __input
+    try {
+      __input = require(resolvedPath)
+    } catch (e) {
+      console.error(e)
+    }
+    
     const _input = __input.default ? __input.default : __input
     const input = Array.isArray(_input) ? _input : [_input]
 
@@ -39,13 +47,13 @@ export default class Animationis {
       if (postfix) Log.info(`[Processing stage ${postfix}]`)
       const baseName = postfix ? `${fileName}-${postfix}` : fileName
 
+      if (stage.init) await stage.init()
       const fps = stage.fps
       const component = stage.component
 
       const generateIntermediatePath = frame => Path.join(parsedPath.dir, baseName + "-" + String(frame).padStart(5, "0") + ".png")
 
-      const width = component.getWidth()
-      const height = component.getHeight()
+      const [width, height] = component.getSize()
       const canvas = Canvas.createCanvas(width, height)
       const ctx = canvas.getContext("2d")
 
@@ -53,19 +61,23 @@ export default class Animationis {
       Log.info("  Outputting intermediate files")
       const run = stage.run()
       while (true) {
-        const { _, done } = run.next()
-        ctx.clearRect(0, 0, width, height)
-        component.render(ctx)
+        try {
+          const {_, done} = run.next()
+          ctx.clearRect(0, 0, width, height)
+          component.render(ctx)
 
-        const outputPathIntermediate = generateIntermediatePath(frames)
-        Log.debug(`    Outputting intermediate file: ${outputPathIntermediate}`)
-        await Animationis.writeCurrentCanvas(outputPathIntermediate, canvas)
-        frames++
-        if (done) break
+          if (done) break
+          const outputPathIntermediate = generateIntermediatePath(frames)
+          Log.debug(`    Outputting intermediate file: ${outputPathIntermediate}`)
+          await Animationis.writeCurrentCanvas(outputPathIntermediate, canvas)
+          frames++
+        } catch (e) {
+          console.error(e)
+        }
       }
 
       const inputPath = Path.join(parsedPath.dir, baseName + "-%05d.png")
-      const outputPath = Path.join(parsedPath.dir, baseName + ".png")
+      const outputPath = Path.join(parsedPath.dir, baseName + (options.gif ? ".gif" : ".png"))
       Log.info("  Outputting file: " + outputPath)
       const command = [
         "ffmpeg",
@@ -74,8 +86,8 @@ export default class Animationis {
         `-i ${inputPath}`,
         "-start_number 0",
         `-vframes ${frames}`,
-        "-f apng",
-        "-plays 0",
+        (options.gif ? "-f gif" : "-f apng"),
+        (options.gif ? "-loop 0" : "-plays 0"),
         outputPath
       ].join(" ")
       Log.debug("    Command: " + command)
@@ -110,6 +122,10 @@ export default class Animationis {
       pngStream.on("end", () => writeStream.end())
       writeStream.on("finish", () => resolve())
     })
+  }
+
+  static async loadImage(path) {
+    return await Canvas.loadImage(path)
   }
 }
 

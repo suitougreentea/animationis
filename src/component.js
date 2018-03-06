@@ -1,11 +1,9 @@
 export default class Component {
-  getWidth() {
-    throw new Error("getWidth() must be overrided")
-  }
-  getHeight() {
-    throw new Error("getHeight() must be overrided")
+  async init() {}
+  getSize() {
+    throw new Error("getSize() must be overridden")
   }
   render(ctx) {
-    throw new Error("render() must be overrided")
+    throw new Error("render() must be overridden")
   }
 }
