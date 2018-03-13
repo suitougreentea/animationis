@@ -1,6 +1,7 @@
 import Canvas from "canvas"
 import Log from "loglevel"
 
+import "source-map-support/register"
 import { extensions as InterpretConfig } from "interpret"
 import Rechoir from "rechoir"
 
@@ -14,6 +15,7 @@ export default class Animationis {
   static async processFile(path, _options) {
     const supplement = (opt, def) => { if (opt == null) return def; else return opt }
     const options = {
+      outDir: supplement(_options.outDir, null),
       gif: supplement(_options.gif, false),
       keepIntermediate: supplement(_options.keepIntermediate, false)
     }
@@ -26,6 +28,8 @@ export default class Animationis {
     const fileName = parsedPath.name.split(".")[0]
     Log.debug(`Path resolved: ${resolvedPath}`)
 
+    const outDir = options.outDir ? options.outDir : parsedPath.dir
+
     Log.info(`Loading input file: ${path}`)
     Rechoir.prepare(InterpretConfig, resolvedPath)
     let __input
@@ -34,7 +38,7 @@ export default class Animationis {
     } catch (e) {
       console.error(e)
     }
-    
+
     const _input = __input.default ? __input.default : __input
     const input = Array.isArray(_input) ? _input : [_input]
 
@@ -51,7 +55,7 @@ export default class Animationis {
       const fps = stage.fps
       const component = stage.component
 
-      const generateIntermediatePath = frame => Path.join(parsedPath.dir, baseName + "-" + String(frame).padStart(5, "0") + ".png")
+      const generateIntermediatePath = frame => Path.join(outDir, baseName + "-" + String(frame).padStart(5, "0") + ".png")
 
       const [width, height] = component.getSize()
       const canvas = Canvas.createCanvas(width, height)
@@ -76,8 +80,8 @@ export default class Animationis {
         }
       }
 
-      const inputPath = Path.join(parsedPath.dir, baseName + "-%05d.png")
-      const outputPath = Path.join(parsedPath.dir, baseName + (options.gif ? ".gif" : ".png"))
+      const inputPath = Path.join(outDir, baseName + "-%05d.png")
+      const outputPath = Path.join(outDir, baseName + (options.gif ? ".gif" : ".png"))
       Log.info("  Outputting file: " + outputPath)
       const command = [
         "ffmpeg",
