@@ -1,13 +1,17 @@
 {
   "name": "animationis",
   "version": "0.8.0",
-  "description": "Scripting APNG Generator",
+  "description": "A scripting APNG generator",
   "main": "lib/index.js",
   "scripts": {
     "build": "babel src --out-dir lib",
     "build-watch": "babel src --out-dir lib --watch",
     "test": "mocha --require @babel/register --recursive test/unit",
     "test-watch": "mocha --require @babel/register --watch --recursive test/unit"
+  },
+  "repository": {
+    "type" : "git",
+    "url" : "https://github.com/suitougreentea/animationis.git"
   },
   "author": "suitougreentea",
   "license": "MIT",
