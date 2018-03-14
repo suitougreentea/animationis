@@ -83,7 +83,7 @@ yarn animationis source.js
 
 Input file are written in pure JavaScript.
 Optionally you can use TypeScript, Babel, CoffeeScript, and other languages.
-See [4. (Optional) Install transpiler register](4-optional-install-transpiler-register)
+See [4. (Optional) Install transpiler register](#4-optional-install-transpiler-register)
 
 You must export *stage* or array of *stage*s.
 *stage* is an object which includes:
