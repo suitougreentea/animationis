@@ -203,3 +203,13 @@ export default {
 }
 
 export { default as Component } from "./component"
+
+export function* concurrentGenerator(generators) {
+  const iterators = generators.map(e => e())
+  while (true) {
+    const results = iterators.map(e => e.next())
+    if (results.every(e => e.done)) return
+    yield
+    //yield results.map(e => e.value)
+  }
+}
