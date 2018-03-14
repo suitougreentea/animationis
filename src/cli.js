@@ -1,6 +1,9 @@
 import Animationis from "./index"
 import commander from "commander"
 
+import { canvasBackendList } from "./canvas-backend"
+import { converterBackendList } from "./converter-backend"
+
 import Log from "loglevel"
 Log.setDefaultLevel(2)
 
@@ -9,8 +12,10 @@ let path
 commander
   .arguments("<path>")
   .option("-o, --out-dir <outdir>", "specify output directory")
-  .option("-g, --gif", "output gif instead of apng")
+  .option("-f, --format <format>", "specify output format (default: png)")
   .option("-k, --keep-intermediate", "do not remove intermediate files")
+  .option("-c, --canvas <backend>", `force to set canvas backend (available: ${canvasBackendList.join(", ")})`)
+  .option("-n, --converter <backend>", `force to set converter backend (available: ${converterBackendList.join(", ")})`)
   .option("-v, --verbose", "display verbose output")
   .action(_path => {
     path = _path
@@ -24,8 +29,10 @@ if (!path) {
 
 if (commander.verbose) Log.setDefaultLevel(1)
 
-Animationis.processFile(path, {
+Animationis.run(path, {
   outDir: commander.outDir,
-  gif: commander.gif,
-  keepIntermediate: commander.keepIntermediate
+  format: commander.format,
+  canvasBackend: commander.canvas,
+  converterBackend: commander.converter,
+  keepIntermediate: commander.keepIntermediate,
 })

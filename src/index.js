@@ -8,128 +8,199 @@ import Rechoir from "rechoir"
 import Fs from "fs"
 import Path from "path"
 import Util from "util"
-import ChildProcess from "child_process"
 
-// TODO: error handling!
-export default class Animationis {
-  static async processFile(path, _options) {
-    const supplement = (opt, def) => { if (opt == null) return def; else return opt }
-    const options = {
-      outDir: supplement(_options.outDir, null),
-      gif: supplement(_options.gif, false),
-      keepIntermediate: supplement(_options.keepIntermediate, false)
+import { canvasBackendList, getCanvasBackend, getDefaultCanvasBackend } from "./canvas-backend"
+import { converterBackendList, getConverterBackend, getDefaultConverterBackend } from "./converter-backend"
+import { supplement, PropagationError } from "./util"
+
+export default {
+  // In the script you can use this to pass options to the components
+  env: {},
+  // Options passed by CLI
+  options: null,
+  // Canvas backend
+  canvas: null,
+  // Converter backend
+  converter: null,
+
+  inputPath: null,
+  resolvedInputPath: null,
+  parsedInputPath: null,
+  baseName: null,
+  outputDir: null,
+  input: null,
+
+  run: async function(path, _options) {
+    try {
+      await this.init(path, _options)
+    } catch (e) {
+      console.error("Initialization failed:")
+      console.error(e)
+      this.inputPath = null
+      return
     }
-    Log.debug("With options:")
-    Log.debug(options)
+    try {
+      await this.loadInputFile()
+    } catch (e) {
+      console.error("Failed to load input file:")
+      console.error(e)
+      this.inputPath = null
+      return
+    }
 
-    Log.debug(`Resolving input file: ${path}`)
-    const resolvedPath = Path.resolve(path)
-    const parsedPath = Path.parse(path)
-    const fileName = parsedPath.name.split(".")[0]
-    Log.debug(`Path resolved: ${resolvedPath}`)
+    let error = false
 
-    const outDir = options.outDir ? options.outDir : parsedPath.dir
+    for (let index of this.input.keys()) {
+      const stage = this.input[index]
 
-    Log.info(`Loading input file: ${path}`)
-    Rechoir.prepare(InterpretConfig, resolvedPath)
+      let stageName = ""
+      if (this.input.length > 1) stageName = String(index + 1)
+      if (stage.name) stageName = stage.name
+
+      try {
+        await this.processStage(stage, stageName)
+      } catch (e) {
+        console.error(`Failed to process stage ${stageName}:`)
+        console.error(e)
+        error = true
+      }
+    }
+
+    if (error) Log.error("Done with error stages")
+    else Log.info("All stages done!")
+    this.inputPath = null
+  },
+
+  init: async function(path, options) {
+    if (this.inputPath) throw new Error(`Another file ${this.inputPath} is in process`)
+
+    this.env = null
+    this.options = {
+      outDir: supplement(options.outDir, null),
+      format: supplement(options.format, "png"),
+      canvasBackend: supplement(options.canvasBackend, null),
+      converterBackend: supplement(options.converterBackend, null),
+      keepIntermediate: supplement(options.keepIntermediate, false)
+    }
+    Log.debug("Initialize with options:")
+    Log.debug(this.options)
+
+    let canvasName = this.options.canvasBackend
+    if (!canvasName) canvasName = await getDefaultCanvasBackend()
+    if (!canvasName) throw new Error("No installed canvas backend detected. See README.")
+    const canvas = getCanvasBackend(canvasName)
+    if (!canvas) throw new Error(`Unable to find specified canvas backend: ${canvasName}`)
+    if (!await canvas.isAvailable()) throw new Error(`Canvas backend ${canvasName} is not installed. See README.`)
+    this.canvas = canvas
+    try {
+      await this.canvas.init()
+    } catch (e) { throw new PropagationError(`Failed to initialize canvas backend: ${canvasName}`, e) }
+    Log.debug("Initialized canvas backend: " + canvasName)
+
+    let converterName = this.options.converterBackend
+    if (!converterName) converterName = await getDefaultConverterBackend()
+    if (!converterName) throw new Error("No installed converter backend detected. See README.")
+    const converter = getConverterBackend(converterName)
+    if (!converter) throw new Error(`Unable to find specified converter backend: ${converterName}`)
+    if (!await converter.isAvailable()) throw new Error(`Converter backend ${converterName} is not installed. See README.`)
+    if (!await converter.isFormatAvailable(this.options.format)) throw new Error(`Converter backend ${this.options.converter} does not support format ${this.options.format}`)
+    this.converter = converter
+    try {
+      await this.converter.init()
+    } catch (e) { throw new PropagationError(`Failed to initialize converter backend: ${converterName}`, e) }
+    Log.debug("Initialized converter backend: " + converterName)
+
+    this.inputPath = path
+  },
+
+  loadInputFile() {
+    Log.debug(`Resolving input file: ${this.inputPath}`)
+    this.resolvedInputPath = Path.resolve(this.inputPath)
+    this.parsedInputPath = Path.parse(this.inputPath)
+    this.baseName = this.parsedInputPath.name.split(".")[0]
+    Log.debug(`Path resolved: ${this.resolvedInputPath}`)
+
+    this.outputDir = supplement(this.options.outDir, this.parsedInputPath.dir)
+
+    Log.info(`Loading input file: ${this.inputPath}`)
+    Rechoir.prepare(InterpretConfig, this.resolvedInputPath)
     let __input
     try {
-      __input = require(resolvedPath)
-    } catch (e) {
-      console.error(e)
-    }
+      __input = require(this.resolvedInputPath)
+    } catch (e) { throw new PropagationError("An error occurred while loading input file", e) }
 
-    const _input = __input.default ? __input.default : __input
-    const input = Array.isArray(_input) ? _input : [_input]
+    // To support both CommonJS and ES6 export
+    const _input = supplement(__input.default, __input)
+    // Input will be array of "stages"
+    this.input = Array.isArray(_input) ? _input : [_input]
+  },
 
-    for (let index of input.keys()) {
-      const stage = input[index]
+  processStage: async function(stage, stageName) {
+    if (stageName) Log.info(`[Processing stage ${stageName}]`)
+    const stageBaseName = stageName ? `${this.baseName}-${stageName}` : this.baseName
+    const stageBasePath = Path.join(this.outputDir, stageBaseName)
 
-      let postfix = ""
-      if (input.length > 1) postfix = String(index)
-      if (stage.name) postfix = stage.name
-      if (postfix) Log.info(`[Processing stage ${postfix}]`)
-      const baseName = postfix ? `${fileName}-${postfix}` : fileName
-
+    try {
       if (stage.init) await stage.init()
-      const fps = stage.fps
-      const component = stage.component
+    } catch (e) { throw new PropagationError("An error occurred while executing init()", e) }
 
-      const generateIntermediatePath = frame => Path.join(outDir, baseName + "-" + String(frame).padStart(5, "0") + ".png")
+    const fps = stage.fps
+    const component = stage.component
 
-      const [width, height] = component.getSize()
-      const canvas = Canvas.createCanvas(width, height)
-      const ctx = canvas.getContext("2d")
+    const generateIntermediatePath = frame => Path.join(stageBasePath + "-" + String(frame).padStart(5, "0") + ".png")
 
-      let frames = 0
-      Log.info("  Outputting intermediate files")
-      const run = stage.run()
-      while (true) {
+    const [width, height] = component.getSize()
+    const canvas = this.canvas.createCanvas(width, height)
+    const ctx = canvas.getContext("2d")
+
+    let frames = 0
+    Log.info("  Outputting intermediate files")
+    const run = stage.run()
+    while (true) {
+      let done
+      try {
+        const result = run.next()
+        done = result.done
+      } catch (e) { throw new PropagationError("An error occurred while executing run()", e) }
+
+      ctx.clearRect(0, 0, width, height)
+      try {
+        component.render(ctx)
+      } catch (e) { throw new PropagationError("An error occurred while rendering components", e) }
+
+      if (done) break
+      const outputPathIntermediate = generateIntermediatePath(frames)
+      Log.debug(`    Outputting intermediate file: ${outputPathIntermediate}`)
+      try {
+        await this.canvas.saveImage(outputPathIntermediate, canvas)
+      } catch (e) { throw new PropagationError(`An error occurred while writing ${outputPathIntermediate}`, e) }
+      frames++
+    }
+    Log.info(`  ${frames} frames written`)
+
+    const extension = this.converter.getExtension(this.options.format)
+    Log.info("  Outputting file: " + stageBasePath + "." + extension)
+    try {
+      await this.converter.convert(stageBasePath, this.options.format, frames, fps)
+    } catch (e) { throw new PropagationError("An error occurred while converting", e) }
+
+    if (!this.options.keepIntermediate) {
+      const unlink = Util.promisify(Fs.unlink)
+      Log.info("  Removing intermediate files")
+      for (let i = 0; i < frames; i++) {
+        const outputPathIntermediate = generateIntermediatePath(i)
+        Log.debug("    Removing intermediate file: " + outputPathIntermediate)
         try {
-          const {_, done} = run.next()
-          ctx.clearRect(0, 0, width, height)
-          component.render(ctx)
-
-          if (done) break
-          const outputPathIntermediate = generateIntermediatePath(frames)
-          Log.debug(`    Outputting intermediate file: ${outputPathIntermediate}`)
-          await Animationis.writeCurrentCanvas(outputPathIntermediate, canvas)
-          frames++
-        } catch (e) {
-          console.error(e)
-        }
-      }
-
-      const inputPath = Path.join(outDir, baseName + "-%05d.png")
-      const outputPath = Path.join(outDir, baseName + (options.gif ? ".gif" : ".png"))
-      Log.info("  Outputting file: " + outputPath)
-      const command = [
-        "ffmpeg",
-        "-y",
-        `-r ${fps}`,
-        `-i ${inputPath}`,
-        "-start_number 0",
-        `-vframes ${frames}`,
-        (options.gif ? "-f gif" : "-f apng"),
-        (options.gif ? "-loop 0" : "-plays 0"),
-        outputPath
-      ].join(" ")
-      Log.debug("    Command: " + command)
-
-      const exec = Util.promisify(ChildProcess.exec)
-      const { stdout, stderr } = await exec(command)
-      Log.debug("  ffmpeg finished successfully:")
-      Log.debug(stderr)
-
-      if (!options.keepIntermediate) {
-        const unlink = Util.promisify(Fs.unlink)
-        Log.info("  Removing intermediate files")
-        for (let i = 0; i < frames; i++) {
-          const outputPathIntermediate = generateIntermediatePath(i)
-          Log.debug("    Removing intermediate file: " + outputPathIntermediate)
           await unlink(outputPathIntermediate)
-        }
+        } catch (e) { throw new PropagationError(`An error occurred while removing ${outputPathIntermediate}`, e) }
       }
-
-      Log.info("  Done")
     }
 
-    Log.info("All stages done!")
-  }
+    Log.info("  Done")
+  },
 
-  static async writeCurrentCanvas(path, canvas) {
-    return new Promise((resolve, reject) => {
-      const writeStream = Fs.createWriteStream(path)
-      const pngStream = canvas.pngStream()
-
-      pngStream.on("data", chunk => writeStream.write(chunk))
-      pngStream.on("end", () => writeStream.end())
-      writeStream.on("finish", () => resolve())
-    })
-  }
-
-  static async loadImage(path) {
-    return await Canvas.loadImage(path)
+  loadImage: async function(path) {
+    return await this.canvas.loadImage(path)
   }
 }
 

@@ -1,6 +1,6 @@
 {
   "name": "animationis",
-  "version": "0.5.0",
+  "version": "0.8.0",
   "description": "Scripting APNG Generator",
   "main": "lib/index.js",
   "scripts": {
@@ -12,7 +12,7 @@
   "author": "suitougreentea",
   "license": "MIT",
   "dependencies": {
-    "canvas": "^2.0.0-alpha.9",
+    "command-exists": "^1.2.2",
     "commander": "^2.14.1",
     "interpret": "^1.1.0",
     "loglevel": "^1.6.1",
@@ -24,6 +24,8 @@
     "@babel/preset-env": "^7.0.0-beta.40",
     "@babel/register": "^7.0.0-beta.40",
     "babel-plugin-espower": "^3.0.0-beta.1",
+    "canvas": "^2.0.0-alpha.9",
+    "canvas-prebuilt": "^2.0.0-alpha.5",
     "mocha": "^5.0.1",
     "power-assert": "^1.4.4"
   },
