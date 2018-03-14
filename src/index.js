@@ -1,16 +1,14 @@
-import Canvas from "canvas"
 import Log from "loglevel"
+import Fs from "fs"
+import Path from "path"
+import Util from "util"
 
 import "source-map-support/register"
 import { extensions as InterpretConfig } from "interpret"
 import Rechoir from "rechoir"
 
-import Fs from "fs"
-import Path from "path"
-import Util from "util"
-
-import { canvasBackendList, getCanvasBackend, getDefaultCanvasBackend } from "./canvas-backend"
-import { converterBackendList, getConverterBackend, getDefaultConverterBackend } from "./converter-backend"
+import { getCanvasBackend, getDefaultCanvasBackend } from "./canvas-backend"
+import { getConverterBackend, getDefaultConverterBackend } from "./converter-backend"
 import { supplement, PropagationError } from "./util"
 
 export default {
