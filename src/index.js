@@ -153,7 +153,8 @@ export default {
 
     let frames = 0
     Log.info("  Outputting intermediate files")
-    const run = stage.run()
+    const run = stage.run.next ? stage.run : stage.run()
+
     while (true) {
       let done
       try {
