@@ -10,19 +10,19 @@ class CanvasBackend {
 }
 
 class CanvasBackendNodeCanvas extends CanvasBackend {
-  constructor(module) {
+  constructor(moduleName) {
     super()
-    this.module = module
+    this.moduleName = moduleName
     this.canvas = null
   }
 
   async isAvailable() {
-    if (checkModuleAvailability(this.module)) return true
+    return checkModuleAvailability(this.moduleName)
   }
 
   async init() {
-    this.canvas = require(this.module)
-    if (this.module == "canvas-prebuilt") console.warn("A support of canvas-prebuilt is deprecated. Use canvas instead.")
+    this.canvas = require(this.moduleName)
+    if (this.moduleName == "canvas-prebuilt") console.warn("A support of canvas-prebuilt is deprecated. Use canvas instead.")
   }
 
   async loadImage(path) { return this.canvas.loadImage(path) }
