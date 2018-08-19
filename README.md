@@ -27,13 +27,9 @@ npm install animationis
 
 ### 2. Install canvas backend
 
-**Install at least one of these modules: `canvas@next`, `canvas-prebuilt@next`.**
+**Install `canvas@next`.**
 
-`canvas` requires additional per-platform dependencies to be installed.
-[See README of node-canvas](https://github.com/Automattic/node-canvas).
-
-`canvas-prebuilt` package bundles these dependencies, so you do not need to install them manually.
-However, x86 and ARM platforms are not currently supported.
+`canvas-prebuilt` is deprecated because `canvas` now installs prebuilt binaries if it can.
 
 ### 3. Install converter backend
 

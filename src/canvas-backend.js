@@ -22,6 +22,7 @@ class CanvasBackendNodeCanvas extends CanvasBackend {
 
   async init() {
     this.canvas = require(this.module)
+    if (this.module == "canvas-prebuilt") console.warn("A support of canvas-prebuilt is deprecated. Use canvas instead.")
   }
 
   async loadImage(path) { return this.canvas.loadImage(path) }
