@@ -1,5 +1,5 @@
 import Animationis from "./index.js"
-import { Command } from "@commander-js/extra-typings"
+import { Command } from "commander"
 
 import { canvasBackendList } from "./canvas-backend.js"
 import { converterBackendList } from "./converter-backend.js"
