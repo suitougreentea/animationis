@@ -1,34 +1,49 @@
 import Log from "loglevel"
 import Fs from "fs"
 import Path from "path"
+import Url from "url"
 import Util from "util"
 
-import "source-map-support/register"
-import { extensions as InterpretConfig } from "interpret"
-import Rechoir from "rechoir"
+import { CanvasBackend, getCanvasBackend, getDefaultCanvasBackend } from "./canvas-backend.js"
+import { ConverterBackend, getConverterBackend, getDefaultConverterBackend } from "./converter-backend.js"
+import { supplement, PropagationError } from "./util.js"
+import Component from "./component.js"
 
-import { getCanvasBackend, getDefaultCanvasBackend } from "./canvas-backend"
-import { getConverterBackend, getDefaultConverterBackend } from "./converter-backend"
-import { supplement, PropagationError } from "./util"
+type Option = {
+  outDir: string | null
+  format: string
+  canvasBackend: string | null
+  converterBackend: string | null
+  keepIntermediate: boolean
+}
 
-export default {
+export type Stage = {
+  name?: string
+  fps: number
+  component: Component
+  init?: () => void
+  run: Generator | (() => Generator)
+}
+
+export default class Animationis {
   // In the script you can use this to pass options to the components
-  env: {},
+  // TODO: not implemented?
+  // private env: object = {}
   // Options passed by CLI
-  options: null,
+  private static options: Option
   // Canvas backend
-  canvas: null,
+  private static canvas: CanvasBackend<any> // TODO
   // Converter backend
-  converter: null,
+  private static converter: ConverterBackend
 
-  inputPath: null,
-  resolvedInputPath: null,
-  parsedInputPath: null,
-  baseName: null,
-  outputDir: null,
-  input: null,
+  private static inputPath: string | null
+  private static resolvedInputPath: string
+  private static parsedInputPath: Path.ParsedPath
+  private static baseName: string
+  private static outputDir: string
+  private static input: Stage[]
 
-  run: async function(path, _options) {
+  public static async run(path: string, _options: Partial<Option>) {
     try {
       await this.init(path, _options)
     } catch (e) {
@@ -67,12 +82,13 @@ export default {
     if (error) Log.error("Done with error stages")
     else Log.info("All stages done!")
     this.inputPath = null
-  },
+  }
 
-  init: async function(path, options) {
+  private static async init(path: string, options: Partial<Option>) {
     if (this.inputPath) throw new Error(`Another file ${this.inputPath} is in process`)
 
-    this.env = null
+    // TODO: not implemented?
+    // this.env = null
     this.options = {
       outDir: supplement(options.outDir, null),
       format: supplement(options.format, "png"),
@@ -101,7 +117,7 @@ export default {
     const converter = getConverterBackend(converterName)
     if (!converter) throw new Error(`Unable to find specified converter backend: ${converterName}`)
     if (!await converter.isAvailable()) throw new Error(`Converter backend ${converterName} is not installed. See README.`)
-    if (!await converter.isFormatAvailable(this.options.format)) throw new Error(`Converter backend ${this.options.converter} does not support format ${this.options.format}`)
+    if (!await converter.isFormatAvailable(this.options.format)) throw new Error(`Converter backend ${this.options.converterBackend} does not support format ${this.options.format}`)
     this.converter = converter
     try {
       await this.converter.init()
@@ -109,9 +125,11 @@ export default {
     Log.debug("Initialized converter backend: " + converterName)
 
     this.inputPath = path
-  },
+  }
 
-  loadInputFile() {
+  private static async loadInputFile() {
+    if (this.inputPath == null) throw new Error("Internal error: inputPath is null")
+
     Log.debug(`Resolving input file: ${this.inputPath}`)
     this.resolvedInputPath = Path.resolve(this.inputPath)
     this.parsedInputPath = Path.parse(this.inputPath)
@@ -121,19 +139,20 @@ export default {
     this.outputDir = supplement(this.options.outDir, this.parsedInputPath.dir)
 
     Log.info(`Loading input file: ${this.inputPath}`)
-    Rechoir.prepare(InterpretConfig, this.resolvedInputPath)
+    // Rechoir.prepare(InterpretConfig, this.resolvedInputPath)
     let __input
     try {
-      __input = require(this.resolvedInputPath)
+      const url = Url.pathToFileURL(this.resolvedInputPath).toString()
+      __input = await import(url)
     } catch (e) { throw new PropagationError("An error occurred while loading input file", e) }
 
     // To support both CommonJS and ES6 export
-    const _input = supplement(__input.default, __input)
+    const _input = __input.default
     // Input will be array of "stages"
     this.input = Array.isArray(_input) ? _input : [_input]
-  },
+  }
 
-  processStage: async function(stage, stageName) {
+  private static async processStage(stage: Stage, stageName: string) {
     if (stageName) Log.info(`[Processing stage ${stageName}]`)
     const stageBaseName = stageName ? `${this.baseName}-${stageName}` : this.baseName
     const stageBasePath = Path.join(this.outputDir, stageBaseName)
@@ -145,15 +164,15 @@ export default {
     const fps = stage.fps
     const component = stage.component
 
-    const generateIntermediatePath = frame => Path.join(stageBasePath + "-" + String(frame).padStart(5, "0") + ".png")
+    const generateIntermediatePath = (frame: number) => Path.join(stageBasePath + "-" + String(frame).padStart(5, "0") + ".png")
 
     const [width, height] = component.getSize()
     const canvas = this.canvas.createCanvas(width, height)
-    const ctx = canvas.getContext("2d")
+    const ctx = <CanvasRenderingContext2D><any>canvas.getContext("2d") // TODO
 
     let frames = 0
     Log.info("  Outputting intermediate files")
-    const run = stage.run.next ? stage.run : stage.run()
+    const run = "next" in stage.run ? stage.run : stage.run()
 
     while (true) {
       let done
@@ -196,16 +215,16 @@ export default {
     }
 
     Log.info("  Done")
-  },
+  }
 
-  loadImage: async function(path) {
+  public static async loadImage(path: string) {
     return await this.canvas.loadImage(path)
   }
 }
 
-export { default as Component } from "./component"
+export { default as Component } from "./component.js"
 
-export function* concurrentGenerator(generators) {
+export function* concurrentGenerator(generators: (() => Generator)[]) {
   const iterators = generators.map(e => e())
   while (true) {
     const results = iterators.map(e => e.next())
