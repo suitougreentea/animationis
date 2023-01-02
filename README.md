@@ -89,7 +89,7 @@ You must export (as `default`) a `Stage` or an array of `Stage`s.
 |(Optional) `name`|string|If specified, output file name will be `<input file name>-<specified name>.png`. If not, `<input file name>-<stage number>.png` or just `<input file name>.png`|
 |`fps`|number|Frames per second|
 |`component`|[Component](#component)|A component to be rendered|
-|(Optional) `init`|function|Called once in the beginning|
+|(Optional) `init`|async function|Called once in the beginning. You can load image by calling `await Animationis.loadImage(...)` here.|
 |`run`|**generator** function|Each `yield` generates one frame|
 
 TypeScript user:
@@ -111,8 +111,6 @@ You must define and use at least one `Component` to get an output.
 ```js
 import { Component } from "animationis"
 class FooComponent extends Component {
-  // optional. called once before processing
-  async init() { }
   // these 2 methods must be overridden
   getSize() { return [/* width */, /* height */] }
   render(ctx /* : CanvasRenderingContext2D */) {

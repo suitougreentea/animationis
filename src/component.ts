@@ -1,5 +1,4 @@
 export default class Component {
-  async init() {}
   getSize(): [number, number] {
     throw new Error("getSize() must be overridden")
   }

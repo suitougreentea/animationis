@@ -21,7 +21,7 @@ export type Stage = {
   name?: string
   fps: number
   component: Component
-  init?: () => void
+  init?: () => Promise<void>
   run: Generator | (() => Generator)
 }
 
