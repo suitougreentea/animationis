@@ -33,6 +33,15 @@ It means you will have to place the binary in your `$PATH`.
 
 If you are using TypeScript as an input file, install `ts-node`.
 **Since 0.10.0 animationis only supports an input file as a Native ES module, so set `NODE_OPTIONS="--loader ts-node/esm"` before running animationis.**
+Also tsconfig.json needs to be configured. Minimum working settings:
+```json
+{
+  "compilerOptions": {
+    "target": "ES6",
+    "module": "Node16",
+  }
+}
+```
 
 ## Usage
 
